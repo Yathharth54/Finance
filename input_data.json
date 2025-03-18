@@ -1,0 +1,16 @@
+{
+    "financial_data": {
+      "revenues": [100, 120, 140],
+      "expenditures": [80, 90, 110],
+      "economic_indicators": {
+        "inflation_rate": 0.03,
+        "gdp_growth_rate": 0.04
+      }
+    },
+    "policy_goals": {
+      "desired_revenue_increase": 0.1,
+      "risk_tolerance": "medium",
+      "tax_reform_target": 0.15
+    }
+  }
+  
