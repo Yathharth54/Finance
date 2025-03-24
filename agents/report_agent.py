@@ -3,16 +3,17 @@ from pydantic_ai import Agent, RunContext
 from pydantic_ai.settings import ModelSettings
 import json
 
+from skills.report_compiler_tool import compile_report
+
 class ReportOutput(BaseModel):
     report_path: str
 
 REPORT_SYS_PROMPT = """
 <agent_role>
 You are the Report Agent for the Ministry of Finance system. Your task is to compile the data from previous agents into a final report.
-Your available tools are:
-- ReportCompilerTool (to compile text sections)
-- VisualizationGeneratorTool (to generate charts and graphs)
-Your output must be a PDF report saved in the designated output folder, and return a JSON with key "report_path" indicating where the file is saved.
+Your available tool is:
+- ReportCompilerTool (which compiles text sections from budget projections, risk analysis, tax policy recommendations, and visual plots into one PDF report)
+Your output must be a PDF report saved in the designated output folder, and return a JSON object with key "report_path" indicating where the file is saved.
 </agent_role>
 """
 
@@ -29,10 +30,7 @@ class ReportAgent:
         self.register_tools()
 
     def register_tools(self):
-        from skills.report_compiler_tool import compile_report_content
-        from skills.visualization_tool import create_visualizations
-        self.agent.tool_plain(compile_report_content)
-        self.agent.tool_plain(create_visualizations)
+        self.agent.tool_plain(compile_report)
 
     def generate_plan(self, user_input: str) -> str:
         prompt = f"{self.agent.system_prompt}\nUser Input: {user_input}\nPlan:"
@@ -47,6 +45,7 @@ class ReportAgent:
         return response.choices[0].message.content
 
     async def run_agent(self, data: dict, budget_info: dict, tax_info: dict) -> str:
+        # Combine data from various agents into one input.
         combined_input = {"data": data, "budget_info": budget_info, "tax_info": tax_info}
         plan = self.generate_plan(f"Compile a final report from: {combined_input}")
         print("[ReportAgent] Generated Plan:\n", plan)

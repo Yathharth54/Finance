@@ -3,17 +3,16 @@ from pydantic_ai import Agent, RunContext
 from pydantic_ai.settings import ModelSettings
 import json
 
+# Register the tax slab tool from your skills directory.
+from skills.tax_slab_tool import create_tax_slabs
+
 class TaxPolicyOutput(BaseModel):
     recommended_slabs: dict
-    slab_effectiveness: dict
 
 TAX_POLICY_SYS_PROMPT = """
 <agent_role>
-You are the Tax Policy Agent for the Ministry of Finance system. Your task is to recommend new tax slabs based on revenue targets and economic conditions, and analyze the effectiveness of current tax policies.
-Your available tools are:
-- TaxSlabRecommender
-- TaxSlabEffectivenessAnalyzer
-Output a JSON with keys "recommended_slabs" and "slab_effectiveness".
+You are the Tax Policy Agent for the Ministry of Finance system. Your task is to recommend new tax slabs based on the standardized financial data and budget projections using the TaxSlabTool.
+Your output must be a JSON object with keys "recommended_slabs" (which holds the recommended tax slabs) and "slab_effectiveness" (which analyzes the potential effectiveness of these slabs).
 </agent_role>
 """
 
@@ -30,10 +29,7 @@ class TaxPolicyAgent:
         self.register_tools()
 
     def register_tools(self):
-        from skills.tax_slab_tool import recommend_slabs
-        from skills.tax_slab_effectiveness_analyzer import analyze_slabs
-        self.agent.tool_plain(recommend_slabs)
-        self.agent.tool_plain(analyze_slabs)
+        self.agent.tool_plain(create_tax_slabs)
 
     def generate_plan(self, user_input: str) -> str:
         prompt = f"{self.agent.system_prompt}\nUser Input: {user_input}\nPlan:"
@@ -48,8 +44,10 @@ class TaxPolicyAgent:
         return response.choices[0].message.content
 
     async def run_agent(self, data: dict, budget_info: dict) -> dict:
+        # Combine standardized data and budget projections as input.
         combined_input = {"data": data, "budget_info": budget_info}
-        plan = self.generate_plan(f"Based on the standardized data and budget info: {combined_input}, recommend tax slabs and analyze their effectiveness.")
+        user_input = f"Based on the following input {combined_input}, recommend new tax slabs using the TaxSlabTool and provide an analysis of their effectiveness."
+        plan = self.generate_plan(user_input)
         print("[TaxPolicyAgent] Generated Plan:\n", plan)
         context = RunContext(
             deps={},
@@ -61,6 +59,5 @@ class TaxPolicyAgent:
         result = await self.agent.run(context)
         print("[TaxPolicyAgent] Tax policy recommendations complete.")
         return {
-            "recommended_slabs": result.recommended_slabs,
-            "slab_effectiveness": result.slab_effectiveness
+            "recommended_slabs": result.recommended_slabs
         }

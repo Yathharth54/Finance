@@ -1,15 +1,26 @@
+import os
+import json
+from dotenv import load_dotenv
 from pydantic import BaseModel
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.settings import ModelSettings
-import json
+
+# Import and register the tools used by this agent.
+from skills.data_validation_tool import validate_data
+from skills.dataset_standardization_tool import standardize_data
+from skills.visualization_tool import create_visual_plots
+
+# Load environment variables from .env file
+load_dotenv()
 
 class DataManagerOutput(BaseModel):
     standardized_data: dict
+    visual_plots: list  # List of filenames or identifiers for the generated visual plots
 
 DATA_MANAGER_SYS_PROMPT = """
 <agent_role>
-You are the Data Manager Agent for the Ministry of Finance system. Your task is to validate the input financial data using the DataValidationTool and then standardize it using the DatasetStandardizationTool.
-Your output must be a JSON object with the key "standardized_data" that holds the processed data.
+You are the Data Manager Agent for the Ministry of Finance system. Your task is to validate the input financial data using the DataValidationTool, then standardize it using the DatasetStandardizationTool, and finally generate visual plots using the VisualisationTool.
+Your output must be a JSON object with two keys: "standardized_data" that holds the processed data and "visual_plots" that holds a list of the generated visual plot filenames.
 </agent_role>
 """
 
@@ -26,15 +37,14 @@ class DataManagerAgent:
         self.register_tools()
 
     def register_tools(self):
-        from skills.data_validation_tool import validate_input_structure
-        from skills.dataset_standardization_tool import standardize_dataset
-        self.agent.tool_plain(validate_input_structure)
-        self.agent.tool_plain(standardize_dataset)
+        self.agent.tool_plain(validate_data)
+        self.agent.tool_plain(standardize_data)
+        self.agent.tool_plain(create_visual_plots)
 
     def generate_plan(self, user_input: str) -> str:
         prompt = f"{self.agent.system_prompt}\nUser Input: {user_input}\nPlan:"
         response = self.agent.model.chat.completions.create(
-            model="gpt-4o-2024-08-06",
+            model=os.getenv("MODEL", "gpt-4o-2024-08-06"),
             messages=[
                 {"role": "system", "content": self.agent.system_prompt},
                 {"role": "user", "content": user_input}
@@ -43,7 +53,17 @@ class DataManagerAgent:
         )
         return response.choices[0].message.content
 
-    async def run_agent(self, input_data: dict) -> dict:
+    async def run_agent(self, input_data: dict = None) -> dict:
+        # If no input data is provided, load input_data.json from the outer directory
+        if input_data is None:
+            input_file = "input_data.json"
+            if os.path.isfile(input_file):
+                with open(input_file, 'r') as f:
+                    input_data = json.load(f)
+                print(f"[DataManagerAgent] Loaded input data from {input_file}.")
+            else:
+                raise FileNotFoundError(f"{input_file} not found in the directory.")
+
         user_input = f"Process the following input data: {input_data}"
         plan = self.generate_plan(user_input)
         print("[DataManagerAgent] Generated Plan:\n", plan)
@@ -55,5 +75,8 @@ class DataManagerAgent:
         )
         context.input = json.dumps(input_data)
         result = await self.agent.run(context)
-        print("[DataManagerAgent] Final standardized data obtained.")
-        return result.standardized_data
+        print("[DataManagerAgent] Final processed data obtained.")
+        return {
+            "standardized_data": result.standardized_data,
+            "visual_plots": result.visual_plots
+        }
