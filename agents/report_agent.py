@@ -30,7 +30,7 @@ class ReportAgent:
 
     def register_tools(self):
         from skills.report_compiler_tool import compile_report_content
-        from skills.visualization_generator_tool import create_visualizations
+        from skills.visualization_tool import create_visualizations
         self.agent.tool_plain(compile_report_content)
         self.agent.tool_plain(create_visualizations)
 

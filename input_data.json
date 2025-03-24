@@ -1,16 +1,28 @@
 {
-    "financial_data": {
-      "revenues": [100, 120, 140],
-      "expenditures": [80, 90, 110],
-      "economic_indicators": {
-        "inflation_rate": 0.03,
-        "gdp_growth_rate": 0.04
-      }
-    },
-    "policy_goals": {
-      "desired_revenue_increase": 0.1,
-      "risk_tolerance": "medium",
-      "tax_reform_target": 0.15
-    }
-  }
-  
+  "revenue": [
+    { "name": "Tax Revenue", "amount": 5000000 },
+    { "name": "Non-tax Revenue", "amount": 2000000 },
+    { "name": "Grants", "amount": 1000000 },
+    { "name": "Other Income", "amount": 500000 }
+  ],
+  "expenditure": [
+    { "name": "Education", "amount": 3000000 },
+    { "name": "Healthcare", "amount": 2500000 },
+    { "name": "Infrastructure", "amount": 1500000 },
+    { "name": "Defense", "amount": 2000000 }
+  ],
+  "inflation": [
+    { "year": "2021", "rate": 3.5 },
+    { "year": "2022", "rate": 4.0 },
+    { "year": "2023", "rate": 3.8 },
+    { "year": "2024", "rate": 3.2 },
+    { "year": "2025", "rate": 2.9 }
+  ],
+  "gdp_growth": [
+    { "year": "2021", "rate": 2.5 },
+    { "year": "2022", "rate": 3.0 },
+    { "year": "2023", "rate": 2.8 },
+    { "year": "2024", "rate": 2.6 },
+    { "year": "2025", "rate": 2.4 }
+  ]
+}
