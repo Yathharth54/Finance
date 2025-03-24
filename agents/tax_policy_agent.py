@@ -30,7 +30,7 @@ class TaxPolicyAgent:
         self.register_tools()
 
     def register_tools(self):
-        from skills.tax_slab_recommender import recommend_slabs
+        from skills.tax_slab_tool import recommend_slabs
         from skills.tax_slab_effectiveness_analyzer import analyze_slabs
         self.agent.tool_plain(recommend_slabs)
         self.agent.tool_plain(analyze_slabs)

@@ -1,44 +1,103 @@
-import math
-import openai
+import json
 import os
+import numpy as np
 
-# Set your OpenAI API key from environment or config
-openai.api_key = os.getenv("OPENAI_API_KEY", "YOUR_OPENAI_API_KEY")
-
-def generate_budget_forecast(data: dict) -> dict:
+def project_budget(file_path: str) -> dict:
     """
-    Uses historical patterns, growth rates, and LLM to produce a future budget projection.
-    """
-    revenues = data["financial_data"]["revenues"]
-    expenditures = data["financial_data"]["expenditures"]
-    inflation_rate = data["financial_data"]["economic_indicators"]["inflation_rate"]
-    gdp_growth = data["financial_data"]["economic_indicators"]["gdp_growth_rate"]
-
-    # Basic arithmetic projection
-    last_revenue = revenues[-1] if revenues else 0
-    last_expenditure = expenditures[-1] if expenditures else 0
-
-    # Let's do a simple next-year estimate
-    projected_revenue = last_revenue * (1 + gdp_growth + inflation_rate)
-    projected_expenditure = last_expenditure * (1 + inflation_rate)
-
-    # Optionally use LLM to refine or generate textual analysis
-    # (We keep it minimal here, but you can expand it)
-    prompt = f"""You are a finance expert. 
-    We have last year's revenue = {last_revenue} and expenditure = {last_expenditure}.
-    The inflation rate is {inflation_rate}, GDP growth is {gdp_growth}.
-    Suggest an approximate revenue and expenditure for next year."""
+    Loads the JSON file at file_path and performs projections:
+      - For 'revenue': Each category is projected with a fixed 5% growth rate.
+      - For 'expenditure': Each category is projected with a fixed 3% growth rate.
+      - For 'inflation': A linear regression is applied to the year-rate series to predict next year's inflation rate.
+      - For 'gdp_growth': A linear regression is applied to the year-rate series to predict next year's GDP growth rate.
     
-    llm_response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "system", "content": "You are an expert financial forecaster."},
-                  {"role": "user", "content": prompt}]
-    )
+    Prints details about the projection process and returns a dictionary with projected values.
+    """
+    if not os.path.isfile(file_path):
+        print(f"Error: File not found: {file_path}")
+        return {}
+    
+    try:
+        with open(file_path, 'r') as f:
+            data = json.load(f)
+    except json.JSONDecodeError:
+        print(f"Error: Invalid JSON in file: {file_path}")
+        return {}
+    
+    projections = {}
 
-    text_analysis = llm_response["choices"][0]["message"]["content"]
+    # 1. Project revenue: Use a fixed growth rate of 5%
+    revenue_data = data.get("revenue", [])
+    projected_revenue = []
+    revenue_growth_rate = 0.05
+    for item in revenue_data:
+        projected_item = item.copy()
+        current_amount = item.get("amount", 0)
+        projected_item["projected_amount"] = current_amount * (1 + revenue_growth_rate)
+        projected_revenue.append(projected_item)
+        print(f"Revenue '{item.get('name', 'Unknown')}' projected from {current_amount} to {projected_item['projected_amount']:.2f}.")
+    projections["projected_revenue"] = projected_revenue
 
-    return {
-        "projected_revenue": projected_revenue,
-        "projected_expenditure": projected_expenditure,
-        "analysis_summary": text_analysis
-    }
+    # 2. Project expenditure: Use a fixed growth rate of 3%
+    expenditure_data = data.get("expenditure", [])
+    projected_expenditure = []
+    expenditure_growth_rate = 0.03
+    for item in expenditure_data:
+        projected_item = item.copy()
+        current_amount = item.get("amount", 0)
+        projected_item["projected_amount"] = current_amount * (1 + expenditure_growth_rate)
+        projected_expenditure.append(projected_item)
+        print(f"Expenditure '{item.get('name', 'Unknown')}' projected from {current_amount} to {projected_item['projected_amount']:.2f}.")
+    projections["projected_expenditure"] = projected_expenditure
+
+    # 3. Project inflation using linear regression to predict next year's rate
+    inflation_data = data.get("inflation", [])
+    if inflation_data and len(inflation_data) >= 2:
+        years, rates = [], []
+        for item in inflation_data:
+            try:
+                years.append(int(item.get("year")))
+                rates.append(float(item.get("rate")))
+            except (ValueError, TypeError):
+                continue
+        if len(years) >= 2:
+            m, c = np.polyfit(years, rates, 1)  # Linear regression: rate = m * year + c
+            next_year = max(years) + 1
+            projected_inflation_rate = m * next_year + c
+            projections["projected_inflation"] = {"year": str(next_year), "rate": round(projected_inflation_rate, 2)}
+            print(f"Inflation projected for year {next_year} is {projected_inflation_rate:.2f} using linear regression.")
+        else:
+            avg_rate = np.mean(rates) if rates else 0
+            next_year = max(years) + 1 if years else "Unknown"
+            projections["projected_inflation"] = {"year": str(next_year), "rate": round(avg_rate, 2)}
+            print(f"Not enough data for regression. Using average inflation rate {avg_rate:.2f} for year {next_year}.")
+    else:
+        print("Insufficient inflation data for projection.")
+        projections["projected_inflation"] = {}
+
+    # 4. Project GDP Growth using linear regression to predict next year's rate
+    gdp_growth_data = data.get("gdp_growth", [])
+    if gdp_growth_data and len(gdp_growth_data) >= 2:
+        years, rates = [], []
+        for item in gdp_growth_data:
+            try:
+                years.append(int(item.get("year")))
+                rates.append(float(item.get("rate")))
+            except (ValueError, TypeError):
+                continue
+        if len(years) >= 2:
+            m, c = np.polyfit(years, rates, 1)
+            next_year = max(years) + 1
+            projected_gdp_growth_rate = m * next_year + c
+            projections["projected_gdp_growth"] = {"year": str(next_year), "rate": round(projected_gdp_growth_rate, 2)}
+            print(f"GDP Growth projected for year {next_year} is {projected_gdp_growth_rate:.2f} using linear regression.")
+        else:
+            avg_rate = np.mean(rates) if rates else 0
+            next_year = max(years) + 1 if years else "Unknown"
+            projections["projected_gdp_growth"] = {"year": str(next_year), "rate": round(avg_rate, 2)}
+            print(f"Not enough data for regression. Using average GDP growth rate {avg_rate:.2f} for year {next_year}.")
+    else:
+        print("Insufficient GDP growth data for projection.")
+        projections["projected_gdp_growth"] = {}
+    
+    print("Budget projection completed.")
+    return projections
