@@ -56,9 +56,3 @@ def standardize_data(file_path: str) -> dict:
 
     return data
 
-# Example usage in main.py:
-if __name__ == "__main__":
-    json_file_path = "input_data.json"  # Adjust this path as needed
-    standardized_data = standardize_data(json_file_path)
-    print("Standardized Data:")
-    print(json.dumps(standardized_data, indent=2))
