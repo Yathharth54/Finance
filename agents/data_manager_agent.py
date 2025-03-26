@@ -25,7 +25,11 @@ Your output must be a JSON object with two keys: "standardized_data" that holds 
 """
 
 class DataManagerAgent:
-    def __init__(self, model):
+    def __init__(self, model, standardization_tool, validation_tool, visualization_tool):
+        self.model = model
+        self.standardization_tool = standardization_tool
+        self.validation_tool = validation_tool
+        self.visualization_tool = visualization_tool
         self.agent = Agent(
             model=model,
             system_prompt=DATA_MANAGER_SYS_PROMPT,
@@ -53,30 +57,6 @@ class DataManagerAgent:
         )
         return response.choices[0].message.content
 
-    async def run_agent(self, input_data: dict = None) -> dict:
-        # If no input data is provided, load input_data.json from the outer directory
-        if input_data is None:
-            input_file = "input_data.json"
-            if os.path.isfile(input_file):
-                with open(input_file, 'r') as f:
-                    input_data = json.load(f)
-                print(f"[DataManagerAgent] Loaded input data from {input_file}.")
-            else:
-                raise FileNotFoundError(f"{input_file} not found in the directory.")
-
-        user_input = f"Process the following input data: {input_data}"
-        plan = self.generate_plan(user_input)
-        print("[DataManagerAgent] Generated Plan:\n", plan)
-        context = RunContext(
-            deps={},
-            model=self.agent.model,
-            usage={},
-            prompt=self.agent.system_prompt
-        )
-        context.input = json.dumps(input_data)
-        result = await self.agent.run(context)
-        print("[DataManagerAgent] Final processed data obtained.")
-        return {
-            "standardized_data": result.standardized_data,
-            "visual_plots": result.visual_plots
-        }
+    async def run_agent(self, data):
+        # Implementation here
+        pass

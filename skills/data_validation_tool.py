@@ -19,7 +19,7 @@ def validate_data(file_path: str) -> bool:
 
     # 2. Load the JSON data
     try:
-        with open(file_path, 'r') as f:
+        with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
     except json.JSONDecodeError:
         print(f"Error: Invalid JSON in file: {file_path}")
