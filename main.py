@@ -1,6 +1,6 @@
 import asyncio
-from orchestrator import main
+from orchestrator import Orchestrator
 
 if __name__ == "__main__":
-    asyncio.run(main())
-    
+    orchestrator = Orchestrator()
+    orchestrator.run()

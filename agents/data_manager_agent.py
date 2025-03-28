@@ -1,10 +1,12 @@
 import os
 import json
+from typing import Dict, Any
 from dotenv import load_dotenv
+from dataclasses import dataclass
 from pydantic import BaseModel
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.settings import ModelSettings
-
+from agent_factory import get_text_model_instance
 # Import and register the tools used by this agent.
 from skills.data_validation_tool import validate_data
 from skills.dataset_standardization_tool import standardize_data
@@ -13,9 +15,16 @@ from skills.visualization_tool import create_visual_plots
 # Load environment variables from .env file
 load_dotenv()
 
+class DataManagerInput(BaseModel):
+    financial_data: Dict[str, Any]
+
 class DataManagerOutput(BaseModel):
-    standardized_data: dict
+    standardized_data: Dict[str, Any]
     visual_plots: list  # List of filenames or identifiers for the generated visual plots
+
+@dataclass
+class DMA_deps:
+    json_file_path: str
 
 DATA_MANAGER_SYS_PROMPT = """
 <agent_role>
@@ -24,39 +33,27 @@ Your output must be a JSON object with two keys: "standardized_data" that holds 
 </agent_role>
 """
 
-class DataManagerAgent:
-    def __init__(self, model, standardization_tool, validation_tool, visualization_tool):
-        self.model = model
-        self.standardization_tool = standardization_tool
-        self.validation_tool = validation_tool
-        self.visualization_tool = visualization_tool
-        self.agent = Agent(
-            model=model,
-            system_prompt=DATA_MANAGER_SYS_PROMPT,
-            name="DataManagerAgent",
-            result_type=DataManagerOutput,
-            retries=2,
-            model_settings=ModelSettings(temperature=0.2)
-        )
-        self.register_tools()
+DMA_model = get_text_model_instance()
 
-    def register_tools(self):
-        self.agent.tool_plain(validate_data)
-        self.agent.tool_plain(standardize_data)
-        self.agent.tool_plain(create_visual_plots)
+DMA_agent = Agent(
+    model=DMA_model, 
+    name="Data Manager Agent",
+    system_prompt=DATA_MANAGER_SYS_PROMPT,
+    deps_type=DMA_deps,
+    retries=3,
+    model_settings=ModelSettings(
+        temperature=0.5,
+    ),
+)
 
-    def generate_plan(self, user_input: str) -> str:
-        prompt = f"{self.agent.system_prompt}\nUser Input: {user_input}\nPlan:"
-        response = self.agent.model.chat.completions.create(
-            model=os.getenv("MODEL", "gpt-4o-2024-08-06"),
-            messages=[
-                {"role": "system", "content": self.agent.system_prompt},
-                {"role": "user", "content": user_input}
-            ],
-            max_tokens=200
-        )
-        return response.choices[0].message.content
+@DMA_agent.tool
+def validate_data_tool(ctx: RunContext[DMA_deps], input_data: json) -> json:
+    return validate_data(file_path=ctx.deps.json_file_path)
 
-    async def run_agent(self, data):
-        # Implementation here
-        pass
+@DMA_agent.tool
+def standardize_data_tool(ctx: RunContext[DMA_deps], input_data: json) -> json:
+    return standardize_data(file_path=ctx.deps.json_file_path)
+
+@DMA_agent.tool
+def create_visual_plots_tool(ctx: RunContext[DMA_deps], input_data: dict) -> json:
+    return create_visual_plots(data=ctx.deps.json_file_path)

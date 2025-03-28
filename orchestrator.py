@@ -1,130 +1,84 @@
-import asyncio
-import os
 import json
-from dotenv import load_dotenv
 from pathlib import Path
-import logging
+from dotenv import load_dotenv
 
 # Import agents
 from agent_factory import get_text_model_instance
-from agents.data_manager_agent import DataManagerAgent
-from agents.budget_agent import BudgetAgent
-from agents.tax_policy_agent import TaxPolicyAgent
-from agents.report_agent import ReportAgent
+from agents.data_manager_agent import DMA_agent, DMA_deps
+from agents.budget_agent import BA_agent, BA_deps
+from agents.tax_policy_agent import TA_agent, TA_deps
+from agents.report_agent import RA_Agent, RA_deps
 
-# Import skills
-from skills.dataset_standardization_tool import standardize_data
-from skills.data_validation_tool import validate_data
-from skills.visualization_tool import create_visual_plots
-from skills.budget_projection_tool import project_budget
-from skills.risk_identification_tool import risk_identification
-from skills.tax_slab_tool import create_tax_slabs
-from skills.report_compiler_tool import compile_report
+first_step_deps = DMA_deps(json_file_path="input_data.json")
 
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+class Orchestrator:
+    def __init__(self, input_file_path="input_data.json"):
+        """
+        Initialize the Orchestrator with input file path and set up agents.
 
-async def main():
-    logger.debug("Starting main execution")
-    load_dotenv()
-    
-    # Get the absolute path to the input file
-    base_dir = Path(__file__).parent
-    input_file_path = base_dir / 'input_data.json'
-    
-    try:
-        with open(input_file_path, 'r') as f:
-            input_data = json.load(f)
-    except FileNotFoundError:
-        logger.error(f"Error: input_data.json file not found at {input_file_path}")
-        return
-    except json.JSONDecodeError:
-        logger.error("Error: Invalid JSON format in input_data.json.")
-        return
-    
-    try:
-        model = get_text_model_instance()
-        logger.debug("Successfully initialized model")
-    except Exception as e:
-        logger.error(f"Failed to initialize model: {str(e)}")
-        return
+        Args:
+            input_file_path (str): Path to the input JSON file (default: "input_data.json").
+        """
+        load_dotenv()  # Load environment variables for model credentials
 
-    # Initialize all tools first
-    try:
-        dataset_tool = DatasetStandardizationTool()
-        validation_tool = DataValidationTool()
-        visualization_tool = VisualizationTool()
-        budget_tool = BudgetProjectionTool()
-        risk_tool = RiskIdentificationTool()
-        tax_tool = TaxSlabTool()
-        report_tool = ReportCompilerTool()
-        logger.debug("Successfully initialized all tools")
-    except Exception as e:
-        logger.error(f"Failed to initialize tools: {str(e)}")
-        return
+        # Resolve absolute path for input file
+        base_dir = Path(__file__).parent
+        self.input_file_path = base_dir / input_file_path
 
-    # Initialize agents with their required tools
-    try:
-        data_manager_agent = DataManagerAgent(
-            model=model,
-            standardization_tool=dataset_tool,
-            validation_tool=validation_tool,
-            visualization_tool=visualization_tool
-        )
+        # Load input data
+        with open(self.input_file_path, 'r') as f:
+            self.input_data = json.load(f)
 
-        budget_agent = BudgetAgent(
-            model=model,
-            projection_tool=budget_tool,
-            risk_tool=risk_tool
-        )
+        # Initialize the model
+        self.model = get_text_model_instance()
 
-        tax_policy_agent = TaxPolicyAgent(
-            model=model,
-            tax_tool=tax_tool
-        )
+    def run(self):
+        """
+        Run the agents in sequence to process data and generate a report.
+        Each agent's result is passed as a dependency to the next agent.
+        """
+        try:
+            # First step: Data Manager Agent
+            dma_result = DMA_agent.run(input_data=self.input_data, deps=first_step_deps)
+            self.logger.debug("Data Manager Agent completed successfully")
 
-        report_agent = ReportAgent(
-            model=model,
-            report_tool=report_tool
-        )
-        
-        logger.debug("Successfully initialized all agents")
-    except Exception as e:
-        logger.error(f"Failed to initialize agents: {str(e)}")
-        return
+            # Update second step dependencies with DMA result
+            second_step_deps = BA_deps(json_file_path="input_data.json")
+            second_step_deps.input_data = dma_result
 
-    # Execute agent pipeline
-    try:
-        # Run Data Manager Agent
-        logger.debug("Running DataManagerAgent...")
-        data_manager_result = await data_manager_agent.run_agent(data=input_data)
-        logger.debug("DataManagerAgent completed successfully")
+            # Second step: Budget Agent
+            ba_result = BA_agent.run(input_data=self.input_data, deps=second_step_deps)
+            self.logger.debug("Budget Agent completed successfully")
 
-        # Run Budget Agent
-        logger.debug("Running BudgetAgent...")
-        budget_result = await budget_agent.run_agent(data=input_data)
-        logger.debug("BudgetAgent completed successfully")
+            # Update third step dependencies with BA result
+            third_step_deps = TA_deps(projections={})
+            third_step_deps.projections = ba_result
 
-        # Run Tax Policy Agent
-        logger.debug("Running TaxPolicyAgent...")
-        tax_policy_result = await tax_policy_agent.run_agent(
-            data=data_manager_result["standardized_data"],
-            budget_info=budget_result["projections"]
-        )
-        logger.debug("TaxPolicyAgent completed successfully")
+            # Third step: Tax Policy Agent
+            ta_result = TA_agent.run(input_data=self.input_data, deps=third_step_deps)
+            self.logger.debug("Tax Policy Agent completed successfully")
 
-        # Run Report Agent
-        logger.debug("Running ReportAgent...")
-        report_path = await report_agent.run_agent(
-            data=data_manager_result["standardized_data"],
-            budget_info=budget_result["projections"],
-            tax_info=tax_policy_result
-        )
-        logger.info(f"Final report generated at: {report_path}")
+            # Update fourth step dependencies with previous results
+            fourth_step_deps = RA_deps(projections={}, risk_ranking="", slabs={}, visual_plots_dir="visual plots")
+            fourth_step_deps.projections = ba_result
+            fourth_step_deps.slabs = ta_result
 
-    except Exception as e:
-        logger.error(f"Error during agent execution: {str(e)}")
-        return
+            # Fourth step: Report Agent
+            ra_result = RA_Agent.run(input_data=self.input_data, deps=fourth_step_deps)
+            self.logger.debug("Report Agent completed successfully")
 
-if __name__ == "__main__":
-    asyncio.run(main())
+            return dma_result, ba_result, ta_result, ra_result
+
+        except Exception as e:
+            if "Data Manager Agent" in str(e):
+                self.logger.error(f"Data Manager Agent failed: {str(e)}")
+            elif "Budget Agent" in str(e):
+                self.logger.error(f"Budget Agent failed: {str(e)}")
+            elif "Tax Policy Agent" in str(e):
+                self.logger.error(f"Tax Policy Agent failed: {str(e)}")
+            elif "Report Agent" in str(e):
+                self.logger.error(f"Report Agent failed: {str(e)}")
+            else:
+                self.logger.error(f"Unexpected error: {str(e)}")
+            
+            raise

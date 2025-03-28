@@ -15,7 +15,7 @@ def get_text_model_instance():
     openai.api_key = api_key
     
     # Use the model specified in the environment or fallback to default
-    model_name = os.getenv("MODEL", "gpt-4")
+    model_name = os.getenv("MODEL")
     
     try:
         # Return the configured model instance

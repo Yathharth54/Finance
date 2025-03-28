@@ -2,11 +2,26 @@ from pydantic import BaseModel
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.settings import ModelSettings
 import json
-
+from typing import Dict, Any
+from dataclasses import dataclass
+from agent_factory import get_text_model_instance
 from skills.report_compiler_tool import compile_report
 
 class ReportOutput(BaseModel):
-    report_path: str
+    output_pdf: str
+
+class ReportInput(BaseModel):
+    projections: Dict[str,Any]
+    risk_ranking: str
+    slabs: Dict[str,Any] 
+    visual_plots_dir: str
+
+@dataclass
+class RA_deps:
+    projections: Dict[str,Any]
+    risk_ranking: str
+    slabs: Dict[str,Any]
+    visual_plots_dir: str
 
 REPORT_SYS_PROMPT = """
 <agent_role>
@@ -17,45 +32,19 @@ Your output must be a PDF report saved in the designated output folder, and retu
 </agent_role>
 """
 
-class ReportAgent:
-    def __init__(self, model):
-        self.agent = Agent(
-            model=model,
-            system_prompt=REPORT_SYS_PROMPT,
-            name="ReportAgent",
-            result_type=ReportOutput,
-            retries=2,
-            model_settings=ModelSettings(temperature=0.2)
-        )
-        self.register_tools()
+RA_model = get_text_model_instance()
 
-    def register_tools(self):
-        self.agent.tool_plain(compile_report)
+RA_agent = Agent(
+    model=RA_model, 
+    name="Data Manager Agent",
+    system_prompt=REPORT_SYS_PROMPT,
+    deps_type=RA_deps,
+    retries=3,
+    model_settings=ModelSettings(
+        temperature=0.5,
+    ),
+)
 
-    def generate_plan(self, user_input: str) -> str:
-        prompt = f"{self.agent.system_prompt}\nUser Input: {user_input}\nPlan:"
-        response = self.agent.model.chat.completions.create(
-            model="gpt-4o-2024-08-06",
-            messages=[
-                {"role": "system", "content": self.agent.system_prompt},
-                {"role": "user", "content": user_input}
-            ],
-            max_tokens=200
-        )
-        return response.choices[0].message.content
-
-    async def run_agent(self, data: dict, budget_info: dict, tax_info: dict) -> str:
-        # Combine data from various agents into one input.
-        combined_input = {"data": data, "budget_info": budget_info, "tax_info": tax_info}
-        plan = self.generate_plan(f"Compile a final report from: {combined_input}")
-        print("[ReportAgent] Generated Plan:\n", plan)
-        context = RunContext(
-            deps={},
-            model=self.agent.model,
-            usage={},
-            prompt=self.agent.system_prompt
-        )
-        context.input = json.dumps(combined_input)
-        result = await self.agent.run(context)
-        print("[ReportAgent] Final report generated.")
-        return result.report_path
+@RA_agent.tool
+def compile_report_tool(ctx: RunContext[RA_deps]):
+    return compile_report(projections=ctx.deps.projections, risk_level=ctx.deps.risk_level, tax_slabs=ctx.deps.tax_slabs, visual_plots_dir=ctx.deps.visual_plots_dir)
