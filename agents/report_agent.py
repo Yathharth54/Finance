@@ -1,7 +1,6 @@
 from pydantic import BaseModel
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.settings import ModelSettings
-import json
 from typing import Dict, Any
 from dataclasses import dataclass
 from agent_factory import get_text_model_instance
@@ -36,7 +35,7 @@ RA_model = get_text_model_instance()
 
 RA_agent = Agent(
     model=RA_model, 
-    name="Data Manager Agent",
+    name="Report Agent",
     system_prompt=REPORT_SYS_PROMPT,
     deps_type=RA_deps,
     retries=3,

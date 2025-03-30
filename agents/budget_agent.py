@@ -38,7 +38,7 @@ BA_model = get_text_model_instance()
 
 BA_agent = Agent(
     model=BA_model, 
-    name="Data Manager Agent",
+    name="Budget Agent",
     system_prompt=BUDGET_AGENT_SYS_PROMPT,
     deps_type=BA_deps,
     retries=3,

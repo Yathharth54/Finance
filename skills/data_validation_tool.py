@@ -3,14 +3,8 @@ import os
 
 def validate_data(file_path: str) -> bool:
     """
-    Loads the JSON file at file_path and validates its structure:
-      - 'revenue' (list of items with 'name', 'amount')
-      - 'expenditure' (list of items with 'name', 'amount')
-      - 'inflation' (list of items with 'year', 'rate')
-      - 'gdp_growth' (list of items with 'year', 'rate')
-
-    Prints out the reason for any validation failure.
-    Returns True if the JSON is valid, False otherwise.
+    Validates the structure of the financial data JSON file.
+    Returns True if valid, False otherwise.
     """
     # 1. Check if file exists
     if not os.path.isfile(file_path):
@@ -20,12 +14,12 @@ def validate_data(file_path: str) -> bool:
     # 2. Load the JSON data
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+            data = json.load(f)  
     except json.JSONDecodeError:
         print(f"Error: Invalid JSON in file: {file_path}")
         return False
 
-    # 3. Define the expected structure
+    # 3. Rest of your validation logic below...
     required_keys = {
         "revenue": ["name", "amount"],
         "expenditure": ["name", "amount"],
@@ -33,7 +27,6 @@ def validate_data(file_path: str) -> bool:
         "gdp_growth": ["year", "rate"]
     }
 
-    # 4. Validate each required key and its structure
     for key, required_fields in required_keys.items():
         if key not in data:
             print(f"Error: Missing required field: '{key}'")
@@ -53,7 +46,6 @@ def validate_data(file_path: str) -> bool:
                     print(f"Error: Missing field '{field}' in item {index} of '{key}'.")
                     return False
                 
-                # Optional type checks
                 if field == "amount" and not isinstance(item[field], (int, float)):
                     print(f"Error: Field 'amount' in item {index} of '{key}' must be numeric.")
                     return False
@@ -63,11 +55,6 @@ def validate_data(file_path: str) -> bool:
                 if field == "year" and not isinstance(item[field], str):
                     print(f"Error: Field 'year' in item {index} of '{key}' must be a string.")
                     return False
-                # If needed, you can add type check for 'name'
-                # if field == "name" and not isinstance(item[field], str):
-                #     print(f"Error: Field 'name' in item {index} of '{key}' must be a string.")
-                #     return False
 
-    # All validations passed
-    print("Validation succeeded! The input JSON structure is correct.")
+    print("Validation succeeded! The input data structure is correct.")
     return True

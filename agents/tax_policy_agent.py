@@ -29,7 +29,7 @@ TA_model = get_text_model_instance()
 
 TA_agent = Agent(
     model=TA_model, 
-    name="Data Manager Agent",
+    name="Tax Policy Agent",
     system_prompt=TAX_POLICY_SYS_PROMPT,
     deps_type=TA_deps,
     retries=3,
