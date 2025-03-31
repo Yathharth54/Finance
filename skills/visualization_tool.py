@@ -1,5 +1,6 @@
 import os
 import uuid
+import json
 import matplotlib.pyplot as plt
 
 def create_visual_plots(data: dict, output_dir: str = "visual plots") -> None:
@@ -84,3 +85,15 @@ def create_visual_plots(data: dict, output_dir: str = "visual plots") -> None:
         print(f"Saved scatter plot for Inflation as: {scatter_inflation_file}")
     else:
         print("No inflation data available for visualization.")
+
+def create_visual_plots_from_json(file_path: str = "input_data.json", output_dir: str = "visual plots") -> None:
+    """
+    Reads a JSON file, converts it into a dictionary, and then passes it to create_visual_plots().
+    """
+    try:
+        with open(file_path, "r") as f:
+            data = json.load(f)
+        print(f"Loaded data from {file_path}")
+        create_visual_plots(data, output_dir)
+    except Exception as e:
+        print(f"Error: {e}")

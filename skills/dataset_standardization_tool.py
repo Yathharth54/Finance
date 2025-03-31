@@ -3,6 +3,7 @@ import os
 from skills.data_validation_tool import validate_data  # Import your validation tool
 
 def standardize_data(file_path: str) -> dict:
+    print(f"\n[DEBUG] Starting standardization for {file_path}")
     """
     Loads the JSON file at file_path and standardizes it by filling missing numeric fields:
       - For 'revenue' and 'expenditure', missing or invalid 'amount' values are filled with the mean amount.
@@ -53,6 +54,6 @@ def standardize_data(file_path: str) -> dict:
                 if field not in item or not isinstance(item[field], (int, float)):
                     print(f"Standardizing: In section '{section}', record {index} missing or invalid '{field}'. Filling with mean value {mean_value:.2f}.")
                     item[field] = mean_value
-
+    
     return data
 
