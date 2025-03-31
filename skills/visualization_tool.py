@@ -1,6 +1,9 @@
 import os
 import uuid
 import json
+import matplotlib
+# Force matplotlib to use a non-interactive backend that doesn't require a GUI
+matplotlib.use('Agg')  # Add this line before importing pyplot
 import matplotlib.pyplot as plt
 
 def create_visual_plots(data: dict, output_dir: str = "visual plots") -> None:
