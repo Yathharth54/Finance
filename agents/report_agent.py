@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.settings import ModelSettings
-from typing import Dict, Any
+from typing import Dict, Any, List
 from dataclasses import dataclass
 from agent_factory import get_text_model_instance
 from skills.report_compiler_tool import compile_report
@@ -9,17 +9,11 @@ from skills.report_compiler_tool import compile_report
 class ReportOutput(BaseModel):
     output_pdf: str
 
-class ReportInput(BaseModel):
-    projections: Dict[str,Any]
-    risk_ranking: str
-    slabs: Dict[str,Any] 
-    visual_plots_dir: str
-
 @dataclass
 class RA_deps:
-    projections: Dict[str,Any]
-    risk_ranking: str
-    slabs: Dict[str,Any]
+    projections: Dict[str, Any]
+    risk_ranking: str  # This should match the parameter name in compile_report (risk_level)
+    tax_slabs: List[Dict[str, Any]]  # This should match the parameter name in compile_report
     visual_plots_dir: str
 
 REPORT_SYS_PROMPT = """
@@ -45,5 +39,14 @@ RA_agent = Agent(
 )
 
 @RA_agent.tool
-def compile_report_tool(ctx: RunContext[RA_deps]):
-    return compile_report(projections=ctx.deps.projections, risk_level=ctx.deps.risk_level, tax_slabs=ctx.deps.tax_slabs, visual_plots_dir=ctx.deps.visual_plots_dir)
+def compile_report_tool(ctx: RunContext[RA_deps]) -> str:
+    """Compile all data into a final PDF report"""
+    output_pdf = "final_budget_report.pdf"
+    compile_report(
+        projections=ctx.deps.projections, 
+        risk_level=ctx.deps.risk_ranking,  # Note this parameter name change
+        tax_slabs=ctx.deps.tax_slabs,      # Note this parameter name change 
+        visual_plots_dir=ctx.deps.visual_plots_dir,
+        output_pdf=output_pdf
+    )
+    return output_pdf
