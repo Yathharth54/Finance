@@ -100,4 +100,5 @@ def project_budget(file_path: str) -> dict:
         projections["projected_gdp_growth"] = {}
     
     print("Budget projection completed.")
+    print(projections)
     return projections
