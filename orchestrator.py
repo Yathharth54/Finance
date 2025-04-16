@@ -75,7 +75,7 @@ async def run_workflow():
         projections=projections,
         risk_level=risk_level,
         tax_slabs=tax_slabs,
-        visual_plots_dir="visual_plots"
+        visual_plots_dir="visual plots"
     )
     print(f"Report Agent completed. Result: {report_result}")
     
