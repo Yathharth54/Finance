@@ -173,3 +173,4 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 visual plots/
+final_budget_report.pdf

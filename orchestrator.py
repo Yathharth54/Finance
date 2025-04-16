@@ -1,90 +1,122 @@
-import json
-from pathlib import Path
+import asyncio
+import logfire
 from dotenv import load_dotenv
-import logging
+import json
 
-# Import agents
-from agent_factory import get_text_model_instance
-from agents.data_manager_agent import DMA_agent, DMA_deps
-from agents.budget_agent import BA_agent, BA_deps
-from agents.tax_policy_agent import TA_agent, TA_deps
-from agents.report_agent import RA_agent, RA_deps
+# Import agent runner functions
+from agents.data_manager_agent import run_data_manager_agent
+from agents.budget_agent import run_budget_agent
+from agents.tax_policy_agent import run_tax_policy_agent
+from agents.report_agent import run_report_agent
 
-first_step_deps = DMA_deps(json_file_path="input_data.json")
+# Load environment variables
+load_dotenv()
 
-class Orchestrator:
+async def run_workflow():
     """
-    Orchestrates the execution of multiple agents in sequence to process financial data
-    and generate reports. Manages the flow of data between agents and handles errors.
+    Orchestrates the workflow by running agents in sequence and passing data between them.
     """
-    def __init__(self, input_file_path="input_data.json"):
-        """
-        Initialize the Orchestrator with input file path and set up agents.
-
-        Args:
-            input_file_path (str): Path to the input JSON file (default: "input_data.json").
-        """
-        load_dotenv()  # Load environment variables for model credentials
-        self.logger = logging.getLogger(__name__)
-
-        # Resolve absolute path for input file
-        base_dir = Path(__file__).parent
-        self.input_file_path = base_dir / input_file_path
-
-        # Load input data
-        with open(self.input_file_path, 'r', encoding='utf-8') as f:
-            self.input_data = json.load(f)
-
-        # Initialize the model
-        self.model = get_text_model_instance()
-
-    def run(self):
-        """
-        Run the agents in sequence to process data and generate a report.
-        Each agent's result is passed as a dependency to the next agent.
-        """
+    print("Starting Ministry of Finance workflow...")
+    
+    # Step 1: Run Data Manager Agent to validate data and create visualizations
+    print("Step 1: Running Data Manager Agent...")
+    data_manager_result = await run_data_manager_agent()
+    print(f"Data Manager Agent completed. Result: {data_manager_result}")
+    
+    # Verify data is valid before proceeding
+    if isinstance(data_manager_result, dict) and data_manager_result.get("data_valid") is False:
+        print("Error: Input data failed validation. Stopping workflow.")
+        return {"status": "failed", "reason": "Data validation failed"}
+    
+    # Step 2: Run Budget Agent to generate projections and risk analysis
+    print("Step 2: Running Budget Agent...")
+    budget_result = await run_budget_agent()
+    print(f"Budget Agent completed. Result type: {type(budget_result).__name__}")
+    
+    # Extract projections and risk level from budget agent result
+    if not isinstance(budget_result, dict):
+        print(f"Error: Budget Agent returned {type(budget_result).__name__} instead of dictionary")
+        return {"status": "failed", "reason": f"Budget Agent returned invalid data type: {type(budget_result).__name__}"}
+    
+    print(f"Budget result keys: {list(budget_result.keys())}")
+    
+    if "projections" not in budget_result:
+        print("Error: Budget Agent did not return 'projections' key")
+        return {"status": "failed", "reason": "Budget data missing 'projections'"}
+        
+    if "risk_ranking" not in budget_result:
+        print("Error: Budget Agent did not return 'risk_ranking' key")
+        return {"status": "failed", "reason": "Budget data missing 'risk_ranking'"}
+    
+    projections = budget_result["projections"]
+    risk_level = budget_result["risk_ranking"]
+    
+    # Step 3: Run Tax Policy Agent to create tax slabs
+    print("Step 3: Running Tax Policy Agent...")
+    tax_result = await run_tax_policy_agent()
+    print(f"Tax Policy Agent completed. Result type: {type(tax_result).__name__}")
+    
+    # Extract tax slabs from tax agent result
+    if not isinstance(tax_result, dict):
+        print(f"Error: Tax Policy Agent returned {type(tax_result).__name__} instead of dictionary")
+        return {"status": "failed", "reason": f"Tax Policy Agent returned invalid data type: {type(tax_result).__name__}"}
+    
+    print(f"Tax result keys: {list(tax_result.keys())}")
+    
+    if "recommended_slabs" not in tax_result:
+        print("Error: Tax Policy Agent did not return 'recommended_slabs' key")
+        return {"status": "failed", "reason": "Tax data missing 'recommended_slabs'"}
+    
+    tax_slabs = tax_result["recommended_slabs"]
+    
+    # Step 4: Run Report Agent to compile final report
+    print("Step 4: Running Report Agent...")
+    report_result = await run_report_agent(
+        projections=projections,
+        risk_level=risk_level,
+        tax_slabs=tax_slabs,
+        visual_plots_dir="visual_plots"
+    )
+    print(f"Report Agent completed. Result: {report_result}")
+    
+    # Handle the report result, which might be a string or dictionary
+    report_path = None
+    if isinstance(report_result, dict) and "report_path" in report_result:
+        report_path = report_result["report_path"]
+    elif isinstance(report_result, str):
+        # If the result is a string, it might be the path directly
+        report_path = report_result
+        # Check if it's a JSON string
         try:
-            # First step: Data Manager Agent
-            dma_result = DMA_agent.run(deps=first_step_deps, user_prompt="Process the input data")
-            self.logger.debug("Data Manager Agent completed successfully")
+            parsed = json.loads(report_result)
+            if isinstance(parsed, dict) and "report_path" in parsed:
+                report_path = parsed["report_path"]
+        except:
+            # Not a JSON string, use as is
+            pass
+    
+    # Return the final result with status information
+    return {
+        "status": "success",
+        "report_path": report_path,
+        "workflow_summary": {
+            "data_validation": data_manager_result,
+            "budget_projections": "completed",
+            "risk_level": risk_level,
+            "tax_slabs_count": len(tax_slabs)
+        }
+    }
 
-            # Update second step dependencies with DMA result
-            second_step_deps = BA_deps(json_file_path="input_data.json")
-            second_step_deps.input_data = dma_result
+# Main function to run the orchestrator
+async def run():
+    try:
+        logfire.configure(send_to_logfire='if-token-present')
+        result = await run_workflow()
+        print(f"Workflow complete: {json.dumps(result, indent=2)}")
+        return result
+    except Exception as e:
+        print(f"Error in workflow: {str(e)}")
+        return {"status": "error", "message": str(e)}
 
-            # Second step: Budget Agent
-            ba_result = BA_agent.run(deps=second_step_deps, user_prompt="Generate budget projections")
-            self.logger.debug("Budget Agent completed successfully")
-
-            # Update third step dependencies with BA result
-            third_step_deps = TA_deps(projections={})
-            third_step_deps.projections = ba_result
-
-            # Third step: Tax Policy Agent
-            ta_result = TA_agent.run(deps=third_step_deps, user_prompt="Generate tax policy recommendations")
-            self.logger.debug("Tax Policy Agent completed successfully")
-
-            # Update fourth step dependencies with previous results
-            fourth_step_deps = RA_deps(projections={}, risk_ranking="", slabs={}, visual_plots_dir="visual plots")
-            fourth_step_deps.projections = ba_result
-            fourth_step_deps.slabs = ta_result
-
-            # Fourth step: Report Agent
-            ra_result = RA_agent.run(deps=fourth_step_deps, user_prompt="Generate final report")
-            self.logger.debug("Report Agent completed successfully")
-
-            return dma_result, ba_result, ta_result, ra_result
-
-        except Exception as e:
-            if "Data Manager Agent" in str(e):
-                self.logger.error("Data Manager Agent failed: %s", str(e))
-            elif "Budget Agent" in str(e):
-                self.logger.error("Budget Agent failed: %s", str(e))
-            elif "Tax Policy Agent" in str(e):
-                self.logger.error("Tax Policy Agent failed: %s", str(e))
-            elif "Report Agent" in str(e):
-                self.logger.error("Report Agent failed: %s", str(e))
-            else:
-                self.logger.error("Unexpected error: %s", str(e))
-            
-            raise
+if __name__ == "__main__":
+    asyncio.run(run())
