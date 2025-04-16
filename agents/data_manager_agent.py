@@ -50,7 +50,7 @@ async def run_data_manager_agent():
     agent = create_data_manager_agent()
     prompt = "Is the input data valid? Yes or No. Also generate visual plots."
     
-    logfire.configure(send_to_logfire='if-token-present')
+    # logfire.configure(send_to_logfire='if-token-present')
     result = await agent.run(user_prompt=prompt)
     return result.data
 

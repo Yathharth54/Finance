@@ -62,7 +62,7 @@ async def run_tax_policy_agent():
     agent = create_tax_policy_agent()
     prompt = "Create tax slabs based on budget projections."
     
-    logfire.configure(send_to_logfire='if-token-present')
+    # logfire.configure(send_to_logfire='if-token-present')
     result = await agent.run(user_prompt=prompt)
     
     # Ensure we're returning the correct data structure

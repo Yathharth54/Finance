@@ -1,6 +1,7 @@
 import asyncio
 from dotenv import load_dotenv
 import json
+import logfire
 from orchestrator import run
 
 # Load environment variables
@@ -11,7 +12,7 @@ async def main():
     Main entry point for the Ministry of Finance system.
     """
     print("Initializing Ministry of Finance system...")
-    
+    logfire.configure(send_to_logfire='if-token-present')
     # Run the orchestrated workflow
     result = await run()
     

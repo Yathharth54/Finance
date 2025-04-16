@@ -71,7 +71,7 @@ async def run_report_agent(projections, risk_level, tax_slabs, visual_plots_dir=
         visual_plots_dir=visual_plots_dir
     )
     
-    logfire.configure(send_to_logfire='if-token-present')
+    # logfire.configure(send_to_logfire='if-token-present')
     result = await agent.run(user_prompt=prompt, deps=deps)
     
     # Ensure we return a consistent structure

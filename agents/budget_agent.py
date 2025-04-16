@@ -63,7 +63,7 @@ async def run_budget_agent():
     agent = create_budget_agent()
     prompt = "Create budget projections and evaluate financial risk."
     
-    logfire.configure(send_to_logfire='if-token-present')
+    # logfire.configure(send_to_logfire='if-token-present')
     result = await agent.run(user_prompt=prompt)
     
     # Ensure we're returning the correct data structure
