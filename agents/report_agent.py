@@ -21,12 +21,25 @@ class RA_deps:
     risk_ranking: str
     tax_slabs: List[Dict[str, Any]]
     visual_plots_dir: str
+    insights: Dict[str, Any] = None
 
 REPORT_SYS_PROMPT = """
 <agent_role>
 You are the Report Agent for the Ministry of Finance system. Your task is to compile the data from previous agents into a final report.
+
+Your first task is to analyze the data and generate insightful paragraphs for each section of the report including:
+1. Revenue analysis
+2. Expenditure analysis
+3. Economic indicators analysis (inflation and GDP)
+4. Risk assessment implications
+5. Tax policy analysis
+6. Analysis of each visualization
+
+Then your second task is to use the ReportCompilerTool to compile all data and your insights into a comprehensive PDF report.
+
 Your available tool is:
 - ReportCompilerTool (which compiles text sections from budget projections, risk analysis, tax policy recommendations, and visual plots into one PDF report)
+
 Your output must be a PDF report saved in the designated output folder, and return a JSON object with key "report_path" indicating where the file is saved.
 </agent_role>
 """
@@ -47,28 +60,42 @@ def create_report_agent():
     
     @RA_agent.tool
     def compile_report_tool(ctx: RunContext[RA_deps]) -> str:
-        """Compile all data into a final PDF report"""
+        """Compile all data into a final PDF report with insights"""
         output_pdf = "final_budget_report.pdf"
         compile_report(
             projections=ctx.deps.projections, 
             risk_level=ctx.deps.risk_ranking,
             tax_slabs=ctx.deps.tax_slabs,
             visual_plots_dir=ctx.deps.visual_plots_dir,
-            output_pdf=output_pdf
+            output_pdf=output_pdf,
+            insights=ctx.deps.insights
         )
         return output_pdf
     
     return RA_agent
 
-async def run_report_agent(projections, risk_level, tax_slabs, visual_plots_dir="visual_plots"):
+async def run_report_agent(projections, risk_level, tax_slabs, visual_plots_dir="visual_plots", insights=None):
     agent = create_report_agent()
-    prompt = "Create a PDF compiling all the information."
+    
+    # If insights are not provided, instruct the agent to generate them
+    if insights is None:
+        prompt = """
+        Create a comprehensive budget report with the following steps:
+        1. First, analyze the data provided and generate insightful paragraphs for each section
+        2. Then, compile all data and insights into a final PDF report
+        
+        Be sure to include analysis for revenue streams, expenditure priorities, economic outlook, 
+        risk assessment, and tax policy implications.
+        """
+    else:
+        prompt = "Create a PDF compiling all the information with the provided insights."
     
     deps = RA_deps(
         projections=projections,
         risk_ranking=risk_level,
         tax_slabs=tax_slabs,
-        visual_plots_dir=visual_plots_dir
+        visual_plots_dir=visual_plots_dir,
+        insights=insights
     )
     
     # logfire.configure(send_to_logfire='if-token-present')
@@ -99,6 +126,6 @@ if __name__ == "__main__":
     result = asyncio.run(run_report_agent(
         projections=sample_data["projections"],
         risk_level="medium",
-        tax_slabs=[{"range": "0-10000", "rate": "10%"}, {"range": "10001-50000", "rate": "20%"}]
+        tax_slabs=[{"slab": 1, "range": "0-10000", "rate": "10%"}, {"slab": 2, "range": "10001-50000", "rate": "20%"}]
     ))
     print("Report result:", result)
